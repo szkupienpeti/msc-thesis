@@ -1,0 +1,249 @@
+\chapter{Simulation Framework} \label{ch:simulator}
+
+In this chapter, I detail the simulation framework itself for the step-by-step controllable simulation of split XSTS models. I describe the basics of the simulation algorithm and present how it can be used to simulate a single execution of a model (\autoref{sec:single-sim}). Then, I extend the previous solution to be able to simulate several executions of a single model, e.g., for exhaustive simulation (\autoref{sec:exhaustive-sim}). I describe the interactions between the simulator and the user, focusing on the different control and observation opportunities (\autoref{sec:interactions}). Finally, I detail the implementation of the simulation framework (\autoref{sec:sim-impl}).
+
+Note that \autoref{sec:single-sim} focuses only on the simulation itself, i.e., how to reuse a model checker to calculate the successor states in a simulation framework. Then, \autoref{sec:exhaustive-sim} extends the previous algorithm for exhaustive simulation and formalizes the representation of executions as execution traces. These sections do not dive into the interaction aspects (control, observation) of the simulator, instead, they are separately detailed in \autoref{sec:interactions}.
+
+\section{Single Simulation}\label{sec:single-sim}
+
+From a high-level perspective, the simulator starts from the initial state of the given split XSTS model. At any state, the simulator calculates the possible successor states by using the underlying model checking infrastructure. If there are more successor states, the simulator asks the user to select from the possible successor states.
+
+Then, the simulation state is changed to the selected successor state. This simulation loop continues until there is no successor state (i.e., the execution of the model is finished) or the selected successor state is covered (i.e., the simulation already visited that state). This basic algorithm is shown in \autoref{alg:sim-basic}.
+
+The usage of an existing model checking framework to calculate the possible successor states guarantees to follow the precise formal semantics of the models so satisfies \textbf{REQ1.} During the calculation of the successor states, the simulator (i.e., the underlying model checking infrastructure) does not use any abstraction over the variables to satisfy \textbf{REQ2.}
+
+Theta transforms every input formalism into a common internal representation, \emph{Abstract Reachability Graph} (ARG)~\cite{theta-arg}. ARG is used to represent an abstract state space with abstract domains, but in this work, we avoid the usage of abstraction, thus, RG is a simplification of ARG. I introduce \emph{Reachability Graph} to represent the state space during the algorithm.
+
+\begin{definition}[Reachability Graph]
+A \emph{reachability graph} (RG) is a 3-tuple $RG = \langle N, E, C \rangle$ where:
+\begin{itemize}
+    \item $N$ is the set of \emph{nodes}, each $n \in N$ representing a concrete state $c$ of the system, marked $c(n) = c$.
+    \item $E \subseteq N \times Ops \times N$ is the set of \emph{edges} labeled with \emph{operations}. An edge $(n_1, op, n_2) \in E$ is present if $c(n_2)$ is a successor state of $c(n_1)$ with operation $op$.
+    \item $C \subseteq N \times N$ is the set of \emph{covered-by edges}. A covered-by edge $(n_1, n_2) \in C$ is present, if $c(n_1) \sqsubset c(n_2)$. Note, that without abstraction, $c_1 \sqsubset c_2 \equiv c_1 = c_2$.
+\end{itemize}
+\end{definition}
+
+A node $n \in N$ is \emph{expanded} if all of its successors are included in $RG$. A node $n$ is \emph{covered} if a covered-by edge $(n, n^\prime) \in C$ exists for another node $n^\prime \in N$. 
+
+\begin{algorithm}[ht]
+\DontPrintSemicolon
+\caption{{\sc SingleSimulate} Simulating a single execution of a split XSTS model in high-level.} \label{alg:sim-basic}
+\KwIn{Split XSTS model $XSTS = \langle V, Tr, In, En \rangle$ with initial state $c_0$}
+\SetKwProg{SingleSimulate}{SingleSimulate}{}{}
+
+\SingleSimulate{$(XSTS)$}{
+ $N \gets \{ n(c_0) \}, E \gets \emptyset, C \gets \emptyset$\;
+ $RG \gets \langle N, E, C \rangle$\;
+ 
+ $successors \gets N$\;
+ 
+\While{$|successors| > 0$}{
+ $node \gets successor \in successors$\;\label{alg:sim-basic-select}
+ $\textsc{Close}(node, RG)$\;
+ $successors \gets \emptyset$\;
+ \If{$node$ is not covered}{
+   $successors \gets \textsc{Expand}(node, RG)$\;
+ }
+}
+\Return\;
+}
+\end{algorithm}
+
+In \autoref{alg:sim-basic}, $RG$ is a \textit{reachability graph}, which is built by the \textsc{Close} and \textsc{Expand} methods -- these methods are existing parts of the model checking infrastructure. $\textsc{Close}(n, RG)$ checks whether the given node $n \in N$ of $RG$ can be covered with another $n^\prime \in N$ node. If yes, it adds the corresponding covered-by edges $(n, n^\prime)$ to $C$. $\textsc{Expand}(n, RG)$ expands the $RG$ with every successor node $n^\prime$, each representing a state $c^\prime$ which is a successor state of $c(n)$, i.e. a transition $t = (c(n), c^\prime)$ exists. For every $n^\prime$ node, an edge $(n, op_t, n^\prime)$ is also added to $E$ where $op_t$ is the operation of transition $t$.
+
+In order to satisfy \textbf{REQ5.1.} (Interactive Control), the selection of the next successor state (see Line \ref{alg:sim-basic-select} of \autoref{alg:sim-basic}) can be made explicit to the user. Thus, the user can interactively control the simulation at every decision point. \textbf{REQ5.3.} (Random Control) can be simply satisfied by replacing the interactive successor selection with a random selection.
+
+\section{Exhaustive Simulation}\label{sec:exhaustive-sim}
+
+In order to satisfy \textbf{REQ5.2.} (Exhaustive Control), it is necessary to be able to simulate more executions of a model. For this purpose, the single simulation (presented in \autoref{alg:sim-basic}) is wrapped by another loop, which controls the reiteration of the simulation.
+
+After the simulation reached its end, the user can tell the simulator to backtrack to the last decision point, where at least one uncovered successor state exists. Then, the simulator restores that previous simulation state and continues the simulation in another direction. The traversal algorithm of every execution is shown in \autoref{alg:sim-exhaustive}.
+
+In order to explore every possible execution, we traverse the entire state space of the model. To do so, starting from the root node representing initial concrete state $c_0$, we build a \emph{reachability graph} $RG$, until it can be expanded. As a result, we will have a complete $RG$, in which every \emph{path} starting from the root node corresponds to an \emph{Execution} of the system.
+
+\begin{definition}[Path]
+We define a \emph{path} $\sigma_P$ in the reachability graph $RG = \langle N, E, C \rangle$ as $\sigma_P = [n_0, e_1, n_1, ..., e_n, n_n]$ an alternating sequence of \emph{nodes} and \emph{edges} of the $RG$, where every $n_i \in N$ and every $e_i \in E$.
+\end{definition}
+
+\begin{definition}[Execution]
+We define an \emph{execution} $\sigma$ of a split XSTS model $\langle V, Tr, In, En \rangle$, where $In = En = \emptyset$, as an alternating sequence of \emph{concrete states} and \emph{operations} $\sigma = [c_0, op_1, c_1, \ldots, op_n, c_n]$, where every $c_i \in C = \times_{v \in V} D_v$ is a concrete state of the model, and every $op_i$ is the operation of a split transition (fragment) $t \in Tr$.
+\end{definition}
+
+Generally, in the case of a sequence $\sigma$, we use the notation $\sigma \leftarrow [\sigma, a]$ for adding $a$ to the end of $\sigma$.
+
+Note, that a path $\sigma_P = [n_0, e_1, n_1, ..., e_n, n_n]$ represents exactly one execution $\sigma = [c_0, op_1, c_1, \ldots, op_n, c_n]$, where every $c_i$ is the concrete state represented by $RG$-node $n_i$, and every $op_i$ is the operation of $RG$-edge $e_i$. In the following, we present an algorithm to collect every path $\sigma_P$ of the $RG$, then map the paths to executions.
+
+\begin{algorithm}[t]
+\DontPrintSemicolon
+\caption{{\sc ExhaustiveSimulate} Simulating every execution of a split XSTS model.} \label{alg:sim-exhaustive}
+\KwIn{Split XSTS model $XSTS = \langle V, Tr, In, En \rangle$ with initial state $c_0$}
+\KwOut{The set of executions $\Sigma = \{ \sigma_1, \ldots, \sigma_n \}$}
+\SetKwProg{ExhaustiveSimulate}{ExhaustiveSimulate}{}{}
+
+\ExhaustiveSimulate{$(XSTS)$}{
+ $\Sigma_P \gets \emptyset,\ \sigma_P \gets [\ ]$\;
+
+ $N \gets \{ n(c_0) \},\ E \gets \emptyset,\ C \gets \emptyset$\;
+ $RG \gets \langle N, E, C \rangle$\;
+ 
+ $successors \gets N$\;
+ 
+ $traverse \gets \textit{true}$\;
+ \While{$traverse$}{
+   \While{$|successors| > 0$}{
+     $node \gets successor \in successors$\;
+     %$successors \gets successors \setminus node$\;
+     $\sigma \gets [\sigma, (\sigma_{P_{\mathrm{last}}}, op, node) \in E, node ]$\;
+     $\textsc{Close}(node, RG)$\;
+     $successors \gets \emptyset$\;
+     \If{$node$ is not covered}{
+       $successors \gets \textsc{Expand}(node, RG)$\;
+     }
+   }
+   $\Sigma \gets \Sigma \cup \{ \mathrm{copy}(\sigma) \}$\;
+   
+   \uIf{$\exists n_{i_{\mathrm{max}}} \in \sigma_P$ with unexpanded successors}{
+     $successors \gets \mathrm{UnexpandedSuccessors}(n_{i_{\mathrm{max}}}, RG)$\;
+   }
+   \Else{
+     $traverse \gets \textit{false}$\;
+   }
+ }
+ $\Sigma \gets \Sigma_P$ as executions\;
+ \Return{$\Sigma$}
+}
+\end{algorithm}
+
+Every path in $RG = \langle N, E, C \rangle$ represents an execution of the system. We expand the $RG$ until any of its nodes $n \in N$ can be expanded -- a node $n \in N$ can be expanded if it has not been expanded earlier, and it is not covered by any other node $n^\prime \neq n \in N$, i.e. no covered-by edge $(n, n^\prime) \in C$ is present. In other words, we stop expanding a path $\sigma_P = [n_0, e_1, n_1, \ldots, e_n, n_n]$, if the node $n_n \in N$ corresponding to the last state $c_n$ of the execution is covered by another node (so the rest of the path is already discovered in a previous one), or if it has no successor nodes (so the path can not be continued).
+
+After a path $\sigma_P = [n_0, e_1, n_1, \ldots, e_n, n_n]$ can not be further expanded, we save it to the set of paths $\Sigma_P$, and backtrack to the last node $n_{i_{\mathrm{max}}}$, where $n_{i_{\mathrm{max}}}$ has at least one unexpanded successor node $n_{i_{\mathrm{max}}+1}^\prime$, available by edge $e_{i_{\mathrm{max}}+1}^\prime = (n_{i_{\mathrm{max}}}, op, n_{i_{\mathrm{max}}+1}^\prime)$ from $n_{i_{\mathrm{max}}}$. Then, we continue with the expansion of $n_{i_{\mathrm{max}}}^\prime$, resulting in a new path $\sigma_P^\prime = [n_0, e_1, n_1, \ldots, e_{i_{\mathrm{max}}}, n_{i_{\mathrm{max}}}, e_{i_{\mathrm{max}}+1}^\prime, n_{i_{\mathrm{max}}+1}^\prime, \ldots]$.
+
+After this, every node $n \in N$ is expanded, and every path $\sigma_P \in \Sigma_P$ has a final node $n_n$ with no successor nodes. Note, that $n_n$ may be covered by another node $n^\prime$ if a covered-by edge $(n_n, n^\prime) \in C$ is present. In this case, path $\sigma_P$ is not a complete path, but it must be continued by any other subpath, starting from node $n^\prime$.
+
+$\sigma_{P_\mathrm{last}}$ denotes the last element (node) of $\sigma_P$. $\Sigma_P \gets \Sigma_P \cup \{ \mathrm{copy}(\sigma_P) \}$ denotes that the later modification of $\sigma_P$ does not change its previously created copy in $\Sigma_P$. $\mathrm{UnexpandedSuccessors}(n, RG)$ where $n \in N$ is an $RG$-node, returns the set of unexpanded successors $n^\prime \in N$ of $n$, i.e. the unexpanded nodes $n^\prime$ for which an edge $(n, op, n^\prime) \in E$ is present.
+
+\subsection{Representing an Execution as an Execution Trace}
+
+Instead of saving every concrete state of a concrete execution as a trace, we just track some of the variables of the system $V_T \subseteq V$. For a specific execution of the model, we would like to observe the value changes of the tracked variables in order.
+
+\begin{definition}[Execution Trace]
+We define an \emph{execution trace} $ET$ as a sequence of sets of pairs $(v_T, \varphi)$, where $v_T \in V_T$ is a tracked variable and $\varphi \in D_{v_T}$ is the value of $v_T$ from its domain $D_{v_T}$. An element $ET_i$ of the trace represents the set of variables (and their values) that have changed as a result of the execution of an operation.
+\end{definition}
+
+Note, that we can observe the precise order of every value change in the tracked variables by splitting every assignment to a tracked variable into a separate fragment. To achieve this, we just need to modify the splitting rule of sequences, by defining these assignments as splittable operations.
+
+If we would like to observe consecutive $v_T := \varphi$ assignments, i.e. an $ET = [ \ldots, \{(v_T, \varphi)\}, \{(v_T, \varphi)\}, \ldots ]$, we need to introduce $v_T := \epsilon$ assignments between them where $\epsilon \in D_{v_T}$ is an unused value of domain $D_{v_T}$. It will result in an $ET = [ \ldots, \{(v_T, \varphi)\}, \{(v_T, \epsilon)\}, \{(v_T, \varphi)\}, \ldots ]$, from which, then we need to remove every $ \{(v_T, \epsilon)\}$, resulting in $ET = [ \ldots, \{(v_T, \varphi)\}, \{(v_T, \varphi)\}, \ldots ]$.
+
+At the initial concrete state $c_0$ (where every variable $v \in V$ has its initial value $c_0(v) = IV(v)$, we add the pair of every tracked variable $v_T \in V_T$ and its initial value $IV(v_T)$ into the execution trace $ET \leftarrow [ \bigcup_{v_T \in V_T} (v_T, IV(v_T)) ]$.
+
+During the execution, in every concrete state $c$, we check whether the value of any tracked variable $v_T \in V_T$ has changed. If so, we add these \emph{value changes} into $ET$. Formally, $ET \leftarrow [ET, \bigcup_{\forall v_T \in V_T:\ \mathrm{last}(v_T) \neq c(v_T)} (v_T, c(v_T))]$ where $\mathrm{last}(v_T)$ denotes the last value of $v_T$ saved to $ET$. At the end of the execution, this algorithm will produce a list of every value change of every tracked variable.
+
+By choosing the right set of tracked variables $V_T$, we can precisely control the granularity of the execution traces, i.e. the observable state changes of the system. With the usage of high-level log statements and the tracking of the corresponding low-level variables, the high-level behaviors can be observed during the simulation, so the simulator satisfies \textbf{REQ3.}
+
+\section{Interactions}\label{sec:interactions}
+
+During the simulation, the simulator communicates with the user (modeled as a \textsf{SimulatorListener}) through an interface. For different communication purposes, a specific \textsf{SimulationState} object is constructed from different aspects of the state of the simulation and passed to the listener. Every \textsf{SimulationState} object contains the exact value of every variable of the system. (\textbf{REQ2.}, \textbf{REQ6.1.}) In some cases, when the communication is two-way (i.e., an answer is required from the user), the \textsf{SimulationState} objects are mutable, so the user can write the answer into them.
+
+These interactions cover the following:
+\begin{itemize}
+    \item \textsf{simulationStarted}: The simulator notifies the listener that the simulation has started. No answer is required.
+    \item \textsf{oneSuccessor}: If there is only one possible successor state, the simulator sends it to the listener. The simulator sends the current simulation state (i.e., the values of the variables) and some trace information about the only fireable transition (e.g., the line and column numbers of the transition in the textual XSTS file). No answer is required.
+    \item \textsf{moreSuccessors}: If there are more possible successor states, i.e., there are more fireable transitions, the simulator sends them (in the same format, like \textsf{oneSuccessor}) to the listener. The listener must answer this, by selecting a transition to fire -- identified by its index. (\textbf{REQ4.})
+    \item \textsf{askForConcreteValue}: If a transition with a havoc statement leads to the selected successor state, the simulator asks the listener for the concrete value to be assigned to the variable -- so instead of a non-deterministic assignment by the simulator, it is the listener's responsibility to select a value from the corresponding domain.
+    \item \textsf{successorSelected}: If a transition, which leads to the selected successor state, does not contain a havoc statement and there were more possible successor states to select from, the simulator notifies the listener about the actually selected successor state. No answer is required.
+    \item \textsf{valueChanged}: At every state, the simulator checked for every tracked variable whether their value has changed. If the value of any tracked variable has changed, the simulator notifies the listener about their new value. (\textbf{REQ6.2.}) No answer is required.
+    \item \textsf{splitTransitionCommitted}: The simulated XSTS model is split, so it has \textit{pseudostates}, which are not real states of the original system -- they just occurred because of the split of the originally atomic transitions. Thus, the simulator notifies the listener, when the current simulation state is a \textit{real} state of the original XSTS model, i.e., not a pseudostate. No answer is required.
+    \item \textsf{simulationEnded}: The simulator notifies the listener when the simulation of the current execution has ended. The listener can make the simulator backtrack to the last decision point with an uncovered successor, and continue the traversal of the possible executions. (\textbf{REQ5.2.})
+\end{itemize}
+
+The sequence diagram of the above-mentioned interactions between the \textit{Simulator} and the \textit{SimulatorListener} is shown in \autoref{fig:sim-seq}.
+
+\begin{figure}[htbp]
+	\centering
+	\includesvg[inkscapelatex=false, height=0.9\textheight, keepaspectratio]{figures/sim-seq.svg}
+	\caption{Sequence Diagram of the interactions between the Simulator and the SimulatorListener.}
+	\label{fig:sim-seq}
+\end{figure}
+
+\section{Control}
+
+The simulator framework supports different \textit{control mechanisms} (\textbf{REQ5.}) which can be achieved with different \textit{SimulatorListener} implementations. This work details three different approaches: \textit{interactive}, \textit{exhaustive}, and \textit{random}. This section gives an overview of these control methods, mainly focusing on the interaction between the \textit{Simulator} and the \textit{SimulatorListener}.
+
+\subsection{Interactive}
+In the case of \textit{interactive control} (\textbf{REQ5.1.}), the goal is to let the user manually control every decision during the simulation. When the simulator notifies the listener with \textsf{moreSuccessors}, the listener directly interacts with the user, who can manually select from the fireable transitions based on some tracing information (e.g., line of the textual XSTS file). In this case, the simulator simulates only a single execution, i.e., there is no need to backtrack at the end of the simulation.
+
+The sequence diagram of the interactive control is shown in \autoref{fig:interactive-control-seq}.
+
+\begin{figure}[ht]
+	\centering
+	\includesvg[inkscapelatex=false, width=0.7\textwidth, keepaspectratio]{figures/interactive-control-seq.svg}
+	\caption{Sequence Diagram of the interactive control.}
+	\label{fig:interactive-control-seq}
+\end{figure}
+
+\subsection{Exhaustive}
+In the case of \textit{exhaustive control} (\textbf{REQ5.2.}), the goal is to automatically traverse every execution of the model which can be achieved with a \textit{depth-first} approach (see \autoref{sec:exhaustive-sim}). When the simulator notifies the listener with \textsf{moreSuccessors}, the listener always returns 0 as \textsf{selectedSuccessorIdx}, i.e., it always selects the first fireable transition. At the end of every execution, the listener makes the simulator backtrack, in order to traverse every possible execution.
+
+The sequence diagram of the exhaustive control is shown in \autoref{fig:exhaustive-control-seq}.
+
+\begin{figure}[ht]
+	\centering
+	\includesvg[inkscapelatex=false, width=0.5\textwidth, keepaspectratio]{figures/exhaustive-control-seq.svg}
+	\caption{Sequence Diagram of the exhaustive control.}
+	\label{fig:exhaustive-control-seq}
+\end{figure}
+
+\subsection{Random}
+In the case of \textit{random control} (\textbf{REQ5.3.}), the goal is to automatically traverse a randomly selected, single execution of the model. When the simulator notifies the listener with \textsf{moreSuccessors}, the listener works very similarly to the \textit{interactive control}. The only difference is the calculation of the \textsf{selectedSuccessorIdx}: in this case, instead of explicitly asking the user, a random number is generated. In this case, the simulator simulates only a single execution, i.e., there is no need to backtrack at the end of the simulation. (For \textit{Monte Carlo}-like sampling, several random executions are needed.)
+
+The sequence diagram of the random control is shown in \autoref{fig:random-control-seq}.
+
+\begin{figure}[ht]
+	\centering
+	\includesvg[inkscapelatex=false, width=0.5\textwidth, keepaspectratio]{figures/random-control-seq.svg}
+	\caption{Sequence Diagram of the random control.}
+	\label{fig:random-control-seq}
+\end{figure}
+
+\section{Observation}
+
+The simulator framework supports different \textit{observation mechanisms} (\textbf{REQ6.}) at different levels. This work details three kinds of observation: \textit{simulation states}, \textit{tracked variables}, and \textit{executions}. This section gives an overview of these observation opportunities, focusing on their timing: simulation states and tracked variables are observed \textit{during the simulation}, while executions are aggregated and graphically presented \textit{after the simulation}.
+
+\subsection{During Simulation}
+After every step, the simulator tells the listener about the current \textit{simulation state} (\textbf{REQ6.1.}) which contains the exact value of every variable. When the simulator changes the current simulation state, it compares the new and old values of every tracked variable. If the value of at least one tracked variable has changed, the simulator notifies the listener about these changes. (\textbf{REQ6.2.})
+
+It is always the listener's responsibility, what to do with the information during the simulation. E.g., the listener can save the values or can show them to the user in \textit{interactive} mode.
+
+\subsection{After Simulation}\label{ssec:observ-aftersim}
+After simulation, the simulator aggregates the executions and presents them graphically. Currently, this feature is only available in \textit{exhaustive} mode, where there are several executions to aggregate. I found, that the most convenient way to summarize every different execution of a model is by choosing the correct set of tracked variables $V_T$ and visualizing the execution traces as a graph.
+
+This representation is brief but complete: it shows the \emph{differences} of the executions in an intuitive way. Transforming an execution trace into a graph is quite straightforward, so I leave its formal definition out. Informally, the \emph{value change sets} are transformed into nodes, and the consecutive ones are connected with directed edges.
+
+The last node of every execution trace of executions, finishing with a covered node, is connected to the successor value changes of the covering node. As a result, the possible ends of incomplete execution traces are also shown, i.e. on this graph, every path ends in a final state of the model, regardless of the covered-by edges.
+
+For a more compact representation, semantically the same nodes are merged into each other. Starting from the leaves, we merge two nodes $n_1, n_2$, if they represent the same value changes, and the sets of their successor nodes $S_1, S_2$ are semantically the same, recursively. Two sets of nodes $S_1, S_2$ are semantically the same, if $|S_1| = |S_2|$, and a mutually exclusive mapping exists between their semantically same elements.
+
+\section{Implementation}\label{sec:sim-impl}
+
+I implemented the simulation framework as an extension of the Theta Model Checking Framework. Implementing the simulator in Theta has two main benefits:
+
+\begin{enumerate}
+    \item I was able to reuse several parts of Theta which are critical in terms of preciseness. Parsing the XSTS model, and maintaining the inner representation of the state space is handled by Theta. My contribution is the implementation of the simulation layer.
+    \item Using the same code base for simulation and verification \textit{guarantees} that they will always give the same results, i.e., the simulator \emph{inherited} the preciseness of Theta.
+\end{enumerate}
+
+I extended the \textsf{XstsCli} class, which is a simple command line interface for the model checking of XSTS models, with a new argument \textsf{--simulate} for defining the simulation mode. Its type is the enum \textsf{SimulatorMode}, with literals \textsf{INTERACTIVE}, \textsf{EXHAUSTIVE}, and \textsf{RANDOM}. I also added argument \textsf{--simtrack} of type String where the comma-separated list of tracked XSTS variable names can be defined.
+
+If the argument \textsf{--simulate} is given, \textsf{XstsCli} instantiates the corresponding \textsf{SimulatorListener} implementation and the newly implemented \textsf{BasicSimulator} class. The \textsf{BasicSimulator} class follows the \textit{builder} design pattern, i.e., its constructor is \textit{private} and only used by the public nested (static) \textsf{Builder} class.
+
+Parameters (e.g., SMT solver instance, XSTS model, \textsf{SimulatorListener} instance, logger, tracked variables) can be passed to the \textsf{Builder} instance through method calls. Then, the \textsf{BasicSimulator} is instantiated with the \textsf{build} method of the \textsf{Builder} class. Finally, the \textsf{simulate} method of the \textsf{BasicSimulator} is called.
+
+Basically, the \textsf{simulate} method implements \autoref{alg:sim-exhaustive}. The simulator uses the existing \textsf{ArgBuilder} class to \textsf{create}, \textsf{close}, and \textsf{expand} the \textsf{ARG}. The simulator iterates through the \textsf{ArgNode} nodes of the \textsf{ARG}.
+
+Every \textsf{ArgNode} contains an \textsf{XstsState} which contains an \textsf{ExplState}. An \textsf{ExplState} represents an explicit state and contains a \textsf{Valuation} object which wraps a map of variable values, i.e., contains the exact value of every variable. These \textsf{Valuation} objects are reused to represent the current simulation state during the interactions between the simulator and the listener.
+
+The \textsf{SimulatorListener} interface serves as a common base for the different listener implementations: \textsf{InteractiveSimulatorListener}, \textsf{ExhaustiveSimulatorListener}, and \textsf{RandomSimulatorListener}. The simulation framework can be easily extended with further listener implementations. The interface defines the same functions as listed in \autoref{sec:interactions}. The arguments of these functions are \textsf{SimulationState} objects.
+
+Every \textsf{SimulationState} contains a \textsf{Valuation} representing the current simulation state itself. For specific interactions, specific subclasses derive from the \textsf{SimulatorState} base class, containing additional interaction-specific information.
+
+In order to visualize the resulting execution traces (see \autoref{ssec:observ-aftersim}), I reused the visualization components of Theta, which can build generic graphs using the \emph{dot} format of GraphViz\footnote{\url{https://graphviz.org/}}. I also implemented a graph simplifier module, which can simplify the generated execution traces into a more readable, compact format.

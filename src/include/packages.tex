@@ -1,0 +1,116 @@
+% thanks to http://tex.stackexchange.com/a/47579/71109
+\usepackage{ifxetex}
+\usepackage{ifluatex}
+\newif\ifxetexorluatex % a new conditional starts as false
+\ifnum 0\ifxetex 1\fi\ifluatex 1\fi>0
+   \xetexorluatextrue
+\fi
+
+\ifxetexorluatex
+  \usepackage{fontspec}
+\else
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage[lighttt]{lmodern}
+  \ttfamily\DeclareFontShape{T1}{lmtt}{m}{it}{<->sub*lmtt/m/sl}{}
+\fi
+
+\usepackage[english,magyar]{babel} % Alapértelmezés szerint utoljára definiált nyelv lesz aktív, de később külön beállítjuk az aktív nyelvet.
+
+\usepackage{emptypage} % omit page number on empty pages
+
+%\usepackage{cmap}
+\usepackage{amsfonts,amsmath,amssymb} % Mathematical symbols.
+%\usepackage[ruled,boxed,resetcount,linesnumbered]{algorithm2e} % For pseudocodes. % beware: this is not compatible with LuaLaTeX, see http://tex.stackexchange.com/questions/34814/lualatex-and-algorithm2e
+\usepackage{booktabs} % For publication quality tables for LaTeX
+\usepackage{graphicx}
+
+\usepackage{subcaption}
+
+%\usepackage{fancyhdr}
+%\usepackage{lastpage}
+
+\usepackage{anysize}
+%\usepackage{sectsty}
+\usepackage{setspace} % For setting line spacing
+
+\usepackage[unicode]{hyperref} % For hyperlinks in the generated document.
+\usepackage{xcolor}
+\usepackage{listings} % For source code snippets.
+
+\usepackage[amsmath,thmmarks]{ntheorem} % Theorem-like environments.
+
+\usepackage{stmaryrd}
+
+\usepackage[linesnumbered,ruled,vlined]{algorithm2e}
+\usepackage{lscape}
+\usepackage{listing}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{xcolor}
+\usepackage{colortbl}
+\usepackage{arydshln}
+
+\usepackage{pdfpages}
+
+%\usepackage[hang]{caption}
+
+\singlespacing
+
+\newcommand{\selecthungarian}{
+	\selectlanguage{magyar}
+	\setlength{\parindent}{2em}
+	\setlength{\parskip}{0em}
+	\frenchspacing
+}
+
+\newcommand{\selectenglish}{
+	\selectlanguage{english}
+	\setlength{\parindent}{0em}
+	\setlength{\parskip}{0.5em}
+	\nonfrenchspacing
+	\renewcommand{\figureautorefname}{Figure}
+	\renewcommand{\tableautorefname}{Table}
+	\renewcommand{\partautorefname}{Part}
+	\renewcommand{\chapterautorefname}{Chapter}
+	\renewcommand{\sectionautorefname}{Section}
+	\renewcommand{\subsectionautorefname}{Section}
+	\renewcommand{\subsubsectionautorefname}{Section}
+}
+
+\usepackage[numbers]{natbib}
+\usepackage{xspace}
+
+\usepackage{svg}
+
+\renewcommand{\algorithmautorefname}{Algorithm}
+
+\lstdefinelanguage{xsts}{
+morekeywords={type, var, ctrl, trans, init, env, choice, or, assume, havoc, par},
+keywordstyle=[2]{\textbf},
+morecomment=[l]{//}, 
+morecomment=[s]{/*}{*/}, 
+morestring=[b]",
+tabsize=4
+}
+
+\lstdefinelanguage{ggen}{
+morekeywords={analysis, component, language, Theta, split-by, CHOICE},
+keywordstyle=[2]{\textbf},
+alsoletter=-, % to highlight the 'split-by' keyword correctly
+morecomment=[l]{//}, 
+morecomment=[s]{/*}{*/}, 
+morestring=[b]",
+tabsize=4
+}
+
+\definecolor{sh_comment}{rgb}{0.25, 0.43, 0.31 } %adjusted, in Eclipse: {0.25, 0.42, 0.30 } = #3F6A4D
+\definecolor{sh_keyword}{rgb}{0.52, 0.11, 0.36}  % #5F1441
+\definecolor{sh_string}{rgb}{0.06, 0.09, 0.85} % #101AF9
+
+\usepackage{tikz}
+
+\newcommand{\cir}[1]{\tikz[baseline]{%
+    \node[anchor=base, draw, circle, inner sep=0, minimum width=1.0em]{#1};}}
+
+\usepackage{epigraph}

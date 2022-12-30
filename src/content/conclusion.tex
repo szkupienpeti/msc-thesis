@@ -1,0 +1,17 @@
+\chapter{Conclusion} \label{conclusion}
+
+For the design of more complex systems, more complex modeling languages with higher abstraction levels are needed. Due to the increasing complexity, the need for \textit{systematic} approaches is growing, too. In the case of behavioral models, this means the \textit{precise} simulation of models, i.e., revealing every possible decision point during the execution, derived from the complex semantics.
+
+In this thesis, I gave an overview of formal methods, formal models, and model simulation. For the modeling of component-based reactive systems, I presented modeling languages with different abstraction levels. These languages have precise formal semantics, as well as open-source tools supporting them.
+
+I defined the requirements on a step-by-step controllable simulation framework for such models and presented my algorithm to make internal non-determinism external, which I implemented as an extension of the Gamma Statechart Composition Framework. I designed a simulation framework based on existing model checking infrastructure and implemented it as an extension of the Theta Model Checking Framework.
+
+Finally, I presented the usage of my work through a case study about the validation of the UML PSSM standard using the exhaustive simulator to generate every possible execution of state machine models.
+
+\section{Future Work} \label{future-work}
+
+For future improvements of the simulator, I have collected a set of requirements that could improve on existing functionalities or extend the tool with useful features.
+
+The simulator should back-annotate every low-level (XSTS) state change to the high-level (statechart) -- instead of back-annotating only the log statements. The simulator should support the tracking of general expressions over the variables -- instead of supporting only individual variables. The simulator should be able to replay execution traces -- supporting the saving, reloading, and replaying of simulation states/execution traces.
+
+The user interface of the simulator could be improved, too. The simulator should be integrated into common IDEs (e.g., Eclipse or Visual Studio Code over Language Server Protocol) -- making its usage more convenient and supporting widely-used debugging use cases, e.g., breakpoints.

@@ -1,0 +1,25 @@
+%----------------------------------------------------------------------------
+\chapter{\bevezetes}
+%----------------------------------------------------------------------------
+
+With the continuous spreading of software solutions in all areas of life, software systems are becoming more and more complex. The increasing complexity requires new approaches to guarantee software quality, by using higher abstraction levels during design to reduce complexity. For this, engineers need convenient high-level modeling languages.
+
+Models play a central role in the development process, especially in safety-critical domains (e.g., automotive, railway, aerospace industry) where engineering companies must use specific approaches in order to meet the corresponding standards. Model-based systems engineering (MBSE) is an actively spreading methodology for the development of complex, safety-critical systems~\cite{se2035}.
+
+In MBSE, models are used to describe several different aspects of the designed system. A fundamental aspect is the behavior of the system, for which many formalisms are available for modeling. Due to the fact that complex systems usually have complex behavior, a high abstraction level is necessary for this aspect, too.
+
+It is a common need for engineers to be able to observe the behavior of the designed system in design time to receive early feedback -- saving both working hours and money. To achieve this goal, a simulator for behavior models is necessary.
+
+In order to precisely simulate behavioral models, having their formal semantics defined is crucial. Due to the high abstraction level of modeling languages used by engineers, the complexity of semantics is also high, making the simulation of such models challenging.
+
+A common problem with complex semantics is non-determinism. Inside a single step of the high-level model, there may be non-deterministic decision points, enabling multiple different executions of a single step. Unfortunately, these inner decision points may remain hidden from the modeler, because executions with only inner differences can still lead the system to the same observable state. Furthermore, the different outputs can not be explained without the observation of the inner decisions.
+
+In order to give full control to the engineers to be able to traverse any legal execution they want, the internal non-determinism of high-level atomic steps should be revealed and made explicit to the user. This could be achieved by breaking down the internally non-deterministic steps into smaller deterministic parts without changing the original semantics of the model.
+
+In this thesis, I present the high-level statechart formalism for the design of component-based reactive systems, in which I present some examples of non-deterministic behavior. Statechart models can be transformed, e.g., into the lower-level extended symbolic transition system (XSTS) formalism~\cite{Gamma}, where non-determinism can still occur. I systematically analyze every source non-determinism in the XSTS formalism and propose an algorithm (called splitting) to make the internal non-determinism inside transitions external, enabling their observation.
+
+Building on the splitting algorithm, I design a step-by-step controllable simulation framework for the precise simulation of split XSTS models. For guaranteed adherence to semantics, the simulation framework relies on an existing model checking infrastructure which is used for the semantics-critical calculation of successor states during the simulation.
+
+This simulator enables the user to explicitly control every decision point during the simulation, regardless of whether it was originally internal or external. Based on the identified use cases, I also define and implement different control mechanisms for the simulator.
+
+The rest of this thesis is structured as follows. In \autoref{background}, I give an overview of the theoretical background behind my work: formal methods, formal models, simulation, and the frameworks I contributed to. In \autoref{ch:reqs}, I define requirements on the simulation framework and design its high-level architecture. In \autoref{ch:splitting}, I formally present my XSTS transition splitting algorithm to make internal non-determinism external. In \autoref{ch:simulator}, I detail the simulation framework focusing on how it satisfies the requirements. In \autoref{example}, I present the use of the splitting algorithm and the simulation framework through a case study. Lastly, in \autoref{conclusion}, I summarize my work and present some future work.

@@ -1,0 +1,37 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?><svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink" contentStyleType="text/css" height="458px" preserveAspectRatio="none" style="width:363px;height:458px;background:#FFFFFF;" version="1.1" viewBox="0 0 363 458" width="363px" zoomAndPan="magnify"><defs/><g><rect fill="#FFFFFF" height="437.9766" style="stroke:#181818;stroke-width:1.5;" width="352" x="5" y="15"/><path d="M162,15 L162,24.2969 L152,34.2969 L5,34.2969 " fill="none" style="stroke:#181818;stroke-width:1.5;"/><text fill="#000000" font-family="sans-serif" font-size="14" font-weight="bold" lengthAdjust="spacing" textLength="28" x="8" y="28.9951">seq</text><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="115" x="40" y="28.9951">Random control</text><rect fill="#FFFFFF" height="251.0625" style="stroke:#181818;stroke-width:1.0;" width="10" x="84" y="122.0234"/><rect fill="#FFFFFF" height="79.3984" style="stroke:#181818;stroke-width:1.0;" width="10" x="256" y="186.2891"/><rect fill="#FFFFFF" height="29.1328" style="stroke:#181818;stroke-width:1.0;" width="10" x="256" y="329.9531"/><line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5.0,5.0;" x1="88.5" x2="88.5" y1="90.8906" y2="391.0859"/><line style="stroke:#181818;stroke-width:0.5;stroke-dasharray:5.0,5.0;" x1="261" x2="261" y1="90.8906" y2="391.0859"/><rect fill="#E2E2F0" height="30.2969" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="83" x="47.5" y="59.5938"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="69" x="54.5" y="79.5889">Simulator</text><rect fill="#E2E2F0" height="30.2969" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="83" x="47.5" y="390.0859"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="69" x="54.5" y="410.0811">Simulator</text><rect fill="#E2E2F0" height="46.5938" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="142" x="190" y="43.2969"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="59" x="231.5" y="63.292">Random</text><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="128" x="197" y="79.5889">SimulatorListener</text><rect fill="#E2E2F0" height="46.5938" rx="2.5" ry="2.5" style="stroke:#181818;stroke-width:0.5;" width="142" x="190" y="390.0859"/><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="59" x="231.5" y="410.0811">Random</text><text fill="#000000" font-family="sans-serif" font-size="14" lengthAdjust="spacing" textLength="128" x="197" y="426.3779">SimulatorListener</text><rect fill="#FFFFFF" height="251.0625" style="stroke:#181818;stroke-width:1.0;" width="10" x="84" y="122.0234"/><rect fill="#FFFFFF" height="79.3984" style="stroke:#181818;stroke-width:1.0;" width="10" x="256" y="186.2891"/><rect fill="#FFFFFF" height="29.1328" style="stroke:#181818;stroke-width:1.0;" width="10" x="256" y="329.9531"/><polygon fill="#181818" points="72,118.0234,82,122.0234,72,126.0234,76,122.0234" style="stroke:#181818;stroke-width:1.0;"/><line style="stroke:#181818;stroke-width:1.0;" x1="10" x2="78" y1="122.0234" y2="122.0234"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="55" x="17" y="116.9575">simulate</text><path d="M35,135.0234 L35,160.0234 L314,160.0234 L314,145.0234 L304,135.0234 L35,135.0234 " fill="#FEFFDD" style="stroke:#181818;stroke-width:0.5;"/><path d="M304,135.0234 L304,145.0234 L314,145.0234 L304,135.0234 " fill="#FEFFDD" style="stroke:#181818;stroke-width:0.5;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="12" x="164.25" y="152.0903">...</text><polygon fill="#181818" points="244,182.2891,254,186.2891,244,190.2891,248,186.2891" style="stroke:#181818;stroke-width:1.0;"/><line style="stroke:#181818;stroke-width:1.0;" x1="94" x2="250" y1="186.2891" y2="186.2891"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="106" x="101" y="181.2231">moreSuccessors</text><path d="M181,199.2891 L181,239.2891 L340,239.2891 L340,209.2891 L330,199.2891 L181,199.2891 " fill="#FEFFDD" style="stroke:#181818;stroke-width:0.5;"/><path d="M330,199.2891 L330,209.2891 L340,209.2891 L330,199.2891 " fill="#FEFFDD" style="stroke:#181818;stroke-width:0.5;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="125" x="187" y="216.356">Generating random</text><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="138" x="187" y="231.4888">selectedSuccessorIdx</text><polygon fill="#181818" points="105,261.6875,95,265.6875,105,269.6875,101,265.6875" style="stroke:#181818;stroke-width:1.0;"/><line style="stroke:#181818;stroke-width:1.0;stroke-dasharray:2.0,2.0;" x1="99" x2="260" y1="265.6875" y2="265.6875"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="138" x="111" y="260.6216">selectedSuccessorIdx</text><path d="M35,278.6875 L35,303.6875 L314,303.6875 L314,288.6875 L304,278.6875 L35,278.6875 " fill="#FEFFDD" style="stroke:#181818;stroke-width:0.5;"/><path d="M304,278.6875 L304,288.6875 L314,288.6875 L304,278.6875 " fill="#FEFFDD" style="stroke:#181818;stroke-width:0.5;"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="12" x="164.25" y="295.7544">...</text><polygon fill="#181818" points="244,325.9531,254,329.9531,244,333.9531,248,329.9531" style="stroke:#181818;stroke-width:1.0;"/><line style="stroke:#181818;stroke-width:1.0;" x1="94" x2="250" y1="329.9531" y2="329.9531"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="106" x="101" y="324.8872">simulationEnded</text><polygon fill="#181818" points="105,355.0859,95,359.0859,105,363.0859,101,359.0859" style="stroke:#181818;stroke-width:1.0;"/><line style="stroke:#181818;stroke-width:1.0;stroke-dasharray:2.0,2.0;" x1="99" x2="260" y1="359.0859" y2="359.0859"/><text fill="#000000" font-family="sans-serif" font-size="13" lengthAdjust="spacing" textLength="111" x="111" y="354.02">backtrack = false</text><polygon fill="#181818" points="21,369.0859,11,373.0859,21,377.0859,17,373.0859" style="stroke:#181818;stroke-width:1.0;"/><line style="stroke:#181818;stroke-width:1.0;stroke-dasharray:2.0,2.0;" x1="15" x2="88" y1="373.0859" y2="373.0859"/><!--MD5=[6622d95f3a7e2c0329df4a797a4ad52c]
+@startuml
+mainframe **seq** Random control
+participant "Simulator" as sim
+participant "Random\nSimulatorListener" as listener
+
+-> sim : simulate
+activate sim
+
+note over sim, listener : ...
+
+sim -> listener : moreSuccessors
+note over listener : Generating random\nselectedSuccessorIdx
+activate listener
+
+listener - -> sim : selectedSuccessorIdx
+deactivate listener
+
+note over sim, listener : ...
+
+sim -> listener : simulationEnded
+activate listener
+listener - -> sim : backtrack = false
+deactivate listener
+
+<- - sim
+deactivate sim
+@enduml
+
+PlantUML version 1.2022.14beta7(Unknown compile time)
+(GPL source distribution)
+Java Runtime: Java(TM) SE Runtime Environment
+JVM: Java HotSpot(TM) 64-Bit Server VM
+Default Encoding: UTF-8
+Language: en
+Country: US
+--></g></svg>

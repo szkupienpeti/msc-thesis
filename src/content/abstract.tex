@@ -1,0 +1,43 @@
+\pagenumbering{roman}
+\setcounter{page}{1}
+
+\selecthungarian
+
+%----------------------------------------------------------------------------
+% Abstract in Hungarian
+%----------------------------------------------------------------------------
+\chapter*{Kivonat}\addcontentsline{toc}{chapter}{Kivonat}
+
+A szoftveres megoldások folyamatosan terjednek az élet minden területén, amivel a biztonságkritikus szoftverrendszerek is egyre bonyolultabbá válnak. Ezen rendszerek minden körülmények között helyesen kell, hogy működjenek, ellenkező esetben a hibás működés katasztrofális következményekkel járna. Biztonságosságuk garantálására új fejlesztési elvek és módszerek terjedtek el, többek között a modellalapú rendszertervezés.
+
+A modellalapú rendszertervezés alkalmazásához a mérnököknek magasszintű modellezési nyelvekre van szükségük, amelyek segítségével leírhatják a rendszerek különböző aspektusait. A rendszerek alapvető aspektusa a dinamikus viselkedés, amely leírására egyre népszerűbb a végrehajtható modellek használata. Ezek a modellek precíz formális szemantikával rendelkeznek, amelyet alacsonyszintű matematikai fogalmak segítségével definiálnak. A mérnökök által használt magasszintű modellek, és alacsony szinten definiált szemantikájuk közti absztrakciós szakadék megnehezíti a magasszintű modellek szemantikájának precíz megértését. Gyakori példa erre a magasszintű modellek atomi lépéseiben lévő belső nemdeterminizmus, amely csak a mögöttes alacsony szinten jelenik meg. Általános igény a mérnökök részéről, hogy a modelljeik szimulációja segítségével megfigyelhessék azok pontos viselkedését, ám a belső nemdeterminizmus a végrehajtások bizonyos részeit vezérelhetetlenné és megfigyelhetetlenné teszi, csökkentve ezzel a szimuláció precizitását.
+
+Diplomatervemben bemutatok különböző absztrakciós szintű modellezési nyelveket, amelyeket komponensalapú reaktív rendszerek modellezésére használnak. A szemantikájukat alapul véve azonosítom a végrehajtásaik során előforduló lehetséges nemdeterminisztikus döntéseket, és bemutatom a saját algoritmusomat, amely a belső nemdeterminizmusokat külsővé alakítja. Erre építve megtervezek egy szimulációs keretrendszert, amely lehetővé teszi a felhasználó számára a szimuláció lépésenkénti vezérlését azáltal, hogy minden nemdeterminisztikus lépés vezérlését a felhasználóra bízza. Bemutatom a szimulátor különböző felhasználási módjait, amelyekhez megfelelő vezérlési mechanizmusokat is definiálok.
+
+Az elméleti eredményeimet nyílt forráskódú eszközök (Gamma állapotgép-kompozíciós keretrendszer, Theta modellellenőrző keretrendszer) kiterjesztéseként implementáltam, amit tömören szintén bemutatok. Végül egy esettanulmányon keresztül elemzem a munkám eredményét, és demonstrálom annak használhatóságát.
+
+\vfill
+\selectenglish
+
+
+%----------------------------------------------------------------------------
+% Abstract in English
+%----------------------------------------------------------------------------
+\chapter*{Abstract}\addcontentsline{toc}{chapter}{Abstract}
+
+Safety-critical software systems are becoming more and more complex with the continuous spreading of software solutions in all areas of life. These systems must operate correctly under all circumstances, otherwise, their fault would cause catastrophic consequences. Therefore, for guaranteeing safety, new development principles have been introduced, such as model-based systems engineering (MBSE).
+
+To apply MBSE, engineers need high-level modeling languages for describing the different aspects of systems. One of the crucial aspects is the dynamic behavior, for which the application of executable models is spreading. These models have their precise formal semantics defined by low-level mathematical concepts. The abstraction gap between the high-level models used by engineers, and their semantics defined on a low level, makes it harder to understand the precise semantics of a high-level model. A common example of this is the internal non-determinism inside high-level atomic steps, which may only occur in the hidden low-level. It is a general need for engineers to be able to simulate their models, in order to observe their behavior precisely. Internal non-determinism makes some parts of the executions uncontrollable and unobservable, causing imprecise simulation.
+
+In this thesis, I present some modeling languages with different abstraction levels which are used to model component-based reactive systems. Based on their semantics, I analyze the possible non-deterministic decisions of their execution and propose my own algorithm to make internal non-determinism external. Building on this, I design a simulation framework, which enables the user to control the simulation step-by-step, by making every non-deterministic decision explicit. I also identify different use cases, for which different simulation control mechanisms are presented.
+
+I implemented my theoretical results as parts of open-source tools -- the Gamma Statechart Composition Framework, and the Theta Model Checking Framework -- which I also briefly present. Finally, the use of my work is discussed through a case study.
+
+\vfill
+\cleardoublepage
+
+\selectthesislanguage
+
+\newcounter{romanPage}
+\setcounter{romanPage}{\value{page}}
+\stepcounter{romanPage}

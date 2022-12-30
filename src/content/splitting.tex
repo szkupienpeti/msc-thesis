@@ -1,0 +1,333 @@
+\chapter{Splitting XSTS Transitions}\label{ch:splitting}
+
+In this chapter, I present the splitting of XSTS transitions, a model transformation to eliminate internal non-determinism from XSTS models. I declare the necessity of splitting (\autoref{sec:splitting-motivation}) and give an overview of the different kinds of non-determinism in XSTS models (\autoref{sec:xsts-nondet}). I formally detail the exact rules of splitting the different XSTS operations (\autoref{sec:splitting-rules}) and present an approach to merge all the transition relations of an XSTS model into a single one (\autoref{sec:merging-tranrels}). Finally, I detail the implementation of the splitting algorithm (\autoref{sec:split-impl}).
+
+\section{Motivation}\label{sec:splitting-motivation}
+
+During the execution of an XSTS model, several non-deterministic decisions can occur. Since the goal of this work is to provide a step-by-step controllable simulator, every non-deterministic choice has to be made explicit to the controller of the simulation to satisfy \textbf{REQ4.}
+
+To achieve this goal, first of all, the simulator itself has to observe these non-deterministic decision points. Due to the atomicity of XSTS transitions (and the underlying model checker infrastructure), this observation can not be done inside them, so the original internal non-determinism inside transitions has to be eliminated.
+
+This can be reached by a pre-processing model-transformation step, which breaks down the non-deterministic transitions into smaller, deterministic parts (\textit{micro-steps}), without changing the original behavior of the model -- so the original \textit{control flow}~\cite{cfa} of the micro-steps does not change. Preserving the original semantics is essential in order to satisfy \textbf{REQ1.}
+
+I originally introduced the splitting of XSTS transitions in \cite{xsts-split}.
+
+\section{Non-Determinism in XSTS Models}\label{sec:xsts-nondet}
+
+XSTS models can have different kinds of non-deterministic decision points.
+
+\begin{itemize}
+    \item \textit{External non-determinism}: The execution of a transition set $T$ means the execution of a randomly selected transition $t \in T$ from it. This transition selection is non-deterministic, but this is outside the atomic transitions, so it occurs in a stable state of the system.
+    \item \textit{Internal non-determinism}: The execution of some operations is non-deterministic (e.g., choice, parallel). If a transition $t$ contains a non-deterministic operation inside, due to the atomicity of $t$, we can not fully explain the non-deterministic decision made during the execution of $t$, based on the next successor stable state.
+\end{itemize}
+
+Example \ref{ex:nondet-diff} shows the problem of controllability, and Example \ref{ex:nondet-same} shows the problem of observability, both caused by internal non-determinism.
+
+\begin{example}[Internal non-determinism with different target states]\label{ex:nondet-diff}
+    Consider the following transition:
+    \begin{align*}
+    t = \begin{pmatrix}
+    x := 0, \\
+    (x := x + 1\ or\ x := x + 2)
+    \end{pmatrix}
+    \end{align*}
+    The execution of $t$ can result in two stable states, where $x = 1$, and where $x = 2$. Although we can observe the different states, due to the atomicity of $t$, after selecting it to fire, we can not control its internal behavior.
+\end{example}
+
+\begin{example}[Internal non-determinism with a single target state]\label{ex:nondet-same}
+    Consider the following transition:
+    \begin{align*}
+    t = \begin{pmatrix}
+    x := 0, \\
+    (x := x + 1\ or\ x := x + 2), \\
+    (([x = 1], x := x + 2)\ or\ ([x = 2], x := x + 1))
+    \end{pmatrix}
+    \end{align*}
+    While every execution of $t$ will result in the only stable state, where $x = 3$, after the execution, we can not explain what happened exactly \emph{inside} the execution of the transition: which happened first, the $x := x+1$ or the $x := x+2$.
+\end{example}
+
+In order to be able to fully control and observe non-deterministic decisions, internal non-determinism should be made external.
+
+\subsection{Internal Non-Determinism}
+Inside an XSTS transition, the following operations cause internal non-determinism:
+
+\begin{itemize}
+    \item \textit{Choices}: The selection between the branches $op_i$ of a choice $op_1$ or $\ldots$ or $op_n$ is non-deterministic.
+    \item \textit{Parallels}: In every step of a parallel action $op_1$ || $\ldots$ || $op_n$, the selection between the not-finished branches $op_i$ is non-deterministic.
+    \item \textit{Havocs}: The concrete value $x \in D_v$ assigned to variable $v \in V$ is non-deterministically selected from domain $D_v$ of variable $v$. Havocs are for modeling the non-deterministic inputs from the environment, and this non-determinism can not be made external. However, it is possible to split every havoc into a separate transition, so that the selected value is exactly observable in the successor state of the transition.
+\end{itemize}
+
+Although \textit{conditionals} do not cause internal non-determinism, since the evaluation of the condition $\psi$ of a conditional $(\psi)\ ?\ op_{\mathrm{then}}\ :\ op_{\mathrm{else}}$ is deterministic, the splitting of $\psi$, $op_{\mathrm{then}}$ and $op_{\mathrm{else}}$ makes the observation of the actual execution easier.
+
+In general, splitting is a \textit{model-transformation} defined at the following levels:
+\begin{itemize}
+    \item The splitting of an \textit{XSTS model} $\langle V, Tr, In, En \rangle$ splits every transition set $Tr, In, En$, resulting in a split XSTS model $\langle V^\prime, Tr^\prime, In^\prime, En^\prime \rangle$.
+    \item The splitting of a \textit{transition set} $T$ means the splitting of every transition $t \in T$.
+    \item The splitting of a \textit{transition} $t$ breaks it down into smaller transitions (\textit{fragments)}, yielding at least one split transition, so the split transition set $T^\prime$ will contain at least as many transitions as the original $T$: $|T^\prime| \geq |T|$.
+\end{itemize}
+
+The splitting of an XSTS model should not change the possible executions. Informally, it just replaces some non-deterministic operations with deterministic ones and transforms the original internally non-deterministic semantics into external non-determinism by moving every non-deterministic step outside the split transitions.
+
+In other words, the goal of splitting is to eliminate the abstract states from the execution of an XSTS model, making the successor state $s^\prime$ of every transition $t=(s,s^\prime)$ concrete: $|s^\prime| \leq 1$ -- except the transitions containing a havoc statement, in which case it is impossible.
+
+\section{Splitting Rules}\label{sec:splitting-rules}
+
+In the following, we formalize the splitting of a transition relation $T$ by defining splitting rules of $sequences$, $havocs$, $choices$, $conditionals$, and $parallels$. In order to make the originally internal non-deterministic choices external, we introduce a new variable $pc$ which will serve as a \textit{program counter}, to enforce the original control flow: $V^\prime = V \cup \{ pc \}$, $D_{pc} = integer$, $IV(pc) = 0$.
+
+The splitting of a transition $t \in T$ results in a set of split transitions (fragments): $\xsplit(t) = \{ t^\prime_1, \ldots, t^\prime_n \}$. The splitting of a transition relation $T$ results in the union of the fragments of every original transition $t \in T$: $\xsplit(T) = \bigcup_{t \in T} \xsplit(t)$.
+
+\begin{definition}[Fragment]
+A \textit{fragment} of an operation $op$ wraps the operation into a sequence, starting with an assumption on $pc$ and ending with an assignment to $pc$. Formally, $\frag(op, x, y) = ([pc = x], op, pc := y)$, where $x$ is the program counter value, after which $op$ can execute, and $y$ is the program counter value associated with the fragment. These assumptions and assignments will guarantee the original control flow of the model.
+\end{definition}
+
+Note, that the first fragment(s) of the original non-split transition should start with $[pc = 0]$, while the last fragment(s) should end with $pc := 0$. This means, that the original states of the system (i.e., where the system is not in the middle of the execution of an original atomic transition) are the states, where $pc = 0$ holds. A state is called \textit{stable}, if $pc = 0$, otherwise it is called a \textit{pseudostate}.
+
+In the following, we use $\xsplit(op, x, y)$, where $x$ denotes the $pc$ value which should be assumed at the beginning of the first fragment(s) of $op$, and $y$ denotes the $pc$ value which should be assigned to $pc$ at the end of the last segment(s) of $op$. For transitions $t \in T$, this means $\xsplit(t) = \xsplit(t, 0, 0)$.
+
+The \textit{splittable} operations are havocs, choices, conditionals, and parallels.
+
+\subsection{Sequence}
+In case of a sequence $seq = op_1, \ldots, op_n$, if $op_i$ is the first splittable operation, the resulting fragments will be $\xsplit(seq, x, y) = \{ (\frag((op_1, \ldots, op_{i-1}), x, \xi_1), \xsplit(op_i, \xi_1, \xi_2), \xsplit((op_{i+1}, \ldots, op_n), \xi_2, y)\}$, where $\xi_i$ denotes a unique program counter value, which can be generated incrementally, for example. If there is no splittable operation in $seq$, $\xsplit(seq) = \frag(seq, x, y)$.
+
+Example \ref{ex:seq-nosplit} shows a sequence without any splittable operation, so no actual splitting is performed. I show more complex examples in the following.
+
+\begin{example}[Splitting sequence with non-splittable operations]\label{ex:seq-nosplit} For transition $t = ([x = 0], x := 1, y := 2)$ with no splittable operation, splitting will result in only a single fragment:
+
+\begin{align*}
+\xsplit(t) = \xsplit(t,0,0) = \frag(t,0,0) = \{ ([pc = 0], [x = 0], x := 1, y := 2, pc := 0) \}
+\end{align*}
+\end{example}
+
+In order to observe every value change of the tracked variables, it is necessary to split every assignment to them into separate fragments. It can be simply achieved by treating these assignments as splittable operations, like havocs (see \autoref{ssec:split-havoc}).
+
+\subsection{Havoc}\label{ssec:split-havoc}
+The splitting of a \textit{havoc} of form $h = \havoc(v)$ wraps this single basic operation into a separate fragment. Formally, $\xsplit(h, x, y) = \frag(h, x, y) = \{ ([pc = x], \havoc(v), PC := y) \}$.
+
+Although the internal non-determinism caused by $\havoc$ can not be made external, moving it to a separate split transition is beneficial. This separate transition \textit{only} models a non-deterministic assignment, which can be made explicit to the user, letting them choose the actual value.
+
+\begin{example}[Splitting sequence with havoc] For transition $t = (x := 1, \havoc(y), z := y)$ with a splittable havoc, splitting will result in 3 fragments:
+
+\begin{align*}
+\xsplit(t) = \xsplit(t,0,0) = \begin{Bmatrix}
+([pc = 0], & x := 1, & pc := 1), \\
+([pc = 1], & \havoc(y), & pc := 2), \\
+([pc = 2], & z := y, & pc := 0)
+\end{Bmatrix}
+\end{align*}
+\end{example}
+
+\subsection{Choice}
+The splitting of a $choice$ of form $ch = (op_1$ or $\ldots$ or $op_n)$ means splitting all of its branches $op_i$ into fragments, with the same assumption, and the same assignment on $pc$. This will result in a set of fragments for each branch, from which exactly one non-deterministically selected set will execute. Formally, $\xsplit(ch, x, y) = \bigcup_{i=0}^{n} \xsplit(op_i, x, y)$.
+
+\begin{example}[Splitting choice] For transition $t = (x := 1 \textup{ or } x := 2)$ with a splittable $choice$ with 2 branches, splitting will result in 2 fragments:
+
+\begin{align*}
+\xsplit(t) = \xsplit(t,0,0) = \begin{Bmatrix}
+([pc = 0], & x:= 1, & pc := 0), \\
+([pc = 0], & x := 2, & pc := 0)
+\end{Bmatrix}
+\end{align*}
+\end{example}
+
+\begin{example}[Splitting sequence with splittable and non-splittable operations] For transition $t = (y := x, (x := 1 \textup{ or } x := 2), z := x)$ with a splittable $choice$ with 2 branches, in the middle of a $sequence$, splitting will result in 4 fragments:
+
+\begin{align*}\xsplit(t) = \xsplit(t,0,0) = \begin{Bmatrix}
+([pc = 0], & y := x, & pc := 1), \\
+([pc = 1], & x:= 1, & pc := 2), \\
+([pc = 1], & x := 2, & pc := 2), \\
+([pc = 2], & z := x, & pc := 0)
+\end{Bmatrix}
+\end{align*}
+\end{example}
+
+\subsection{Conditional}
+The splitting of a $conditional$ of form $cond = (\psi)\ ?\ op_{\textrm{then}}\ :\ op_{\textrm{else}}$ means splitting the condition into a separate fragment, as well as the splitting of $op_{\textrm{then}}$ and $op_{\textrm{else}}$. In order to keep the original control flow, we need two $pc$ values $\xi_{\textrm{then}}$ and $\xi_{\textrm{else}}$ for $op_{\textrm{then}}$ and $op_{\textrm{else}}$, respectively. Formally, $\xsplit(cond, x, y) = \{ \condfrag(\psi, x, \xi_{\textrm{then}}, \xi_{\textrm{else}}) \} \cup \xsplit(op_{\textrm{then}}, \xi_{\textrm{then}}, y) \cup \xsplit(op_{\textrm{else}}, \xi_{\textrm{else}}, y)$.
+
+The condition fragment $\condfrag(\psi, x, \xi_{\textrm{then}}, \xi_{\textrm{else}})$ checks $pc = x$, then assigns $\xi_{\textrm{then}}$ or $\xi_{\textrm{else}}$ to $pc$ based on the evaluation of $\psi$, repsectively. Formally, $\condfrag(\psi, x, \xi_{\textrm{then}}, \xi_{\textrm{else}}) = ([pc = x], pc := (\psi)\ ?\ \xi_{\textrm{then}}\ :\ \xi_{\textrm{else}})$, where an assignemnt of form $v := \psi\ ?\ a\ :\ b$ means evaluating the Boolean expression $\psi$, and assigning $a$ to $v$, if $\psi$ is true, or $b$, otherwise.
+
+\begin{example}[Splitting conditional]  For transition $t = ((x > 0)\ ?\ y := x\ :\ y := 0)$ with a splittable $conditional$, splitting will result in 3 fragments:
+
+\begin{align*}
+\xsplit(t) = \xsplit(t,0,0) = \begin{Bmatrix}
+([pc = 0], & & pc := (x > 0)\ ?\ 1\ :\ 2), \\
+([pc = 1], & y := x, & pc := 0), \\
+([pc = 2], & y := 0, & pc := 0) \\
+\end{Bmatrix}
+\end{align*}
+\end{example}
+
+\subsection{Parallel}
+The splitting of a $parallel$ of form $par = op_1$ || $\ldots$ || $op_n$ means splitting every operation of every branch into a separate fragment, as well as creating a fragment for $forking$ and $joining$ the branches. For every branch $op_i$, a separate \textit{branch program counter} $pc_i$ is introduced, in order to guarantee the execution order of operations from one branch: $V^\prime = V \cup \{ pc_1, \ldots, pc_n \}$. The assumption on $pc_i$ can be merged into the original $pc$ assumption(s) at the beginning of the fragment with logical $and$.
+
+In order to keep the original control flow between $fork$, branches, and $join$, a new $pc$ value $\xi$ is needed. Formally, $\xsplit(par, x, y) = \{ \forkfrag(x, \xi, \bigcup_{i=1}^{n} pc_i), \bigcup_{i=1}^{n} \bigcup_{j=1}^{|op_i|} \parfrag(\xi, pc_i, op_i, j), \joinfrag(\xi, y, \bigcup_{i=1}^{n} pc_i) \}$.
+
+The $fork$ fragment $\forkfrag(x,\xi,PC)$ checks $pc = x$, then assigns $1$ to every branch program counter $pc_i \in PC$, and $\xi$ to $pc$. Informally, the $fork$ fragment enables the execution of the parallel branches. Formally, $\forkfrag(x,\xi,PC) = ([pc = x], seq_{i=1}^{|PC|} PC_i := 1, pc := \xi)$, where $seq_{i=1}^{n} op_i$ means the sequence of $op_1, \ldots, op_n$.
+
+ Generally, the $j$th operation of branch $op_i$ results in parallel fragments $\parfrag(\xi, pc_i, op_i, j) = \bigcup f^\prime$. First, we split $op_{i_j}$ into fragments with $split^\prime(op_{i_j}, \xi, \xi)$ which will result in the fragments $f$ of $op_{i_j}$. Then, we wrap each of these fragments $f$ into a parallel fragment $f^\prime$, with adding an assumption $[pc_i = j]$ to the beginning, and an assignment $pc_i := \varphi$ to the end, where $\varphi=j+1$, if $j < |op_i|$, otherwise $0$. As a result, $pc_i = 0$ denotes, that the execution of $op_i$ has finished.
+ 
+ I used $\xsplit^\prime$ instead of $\xsplit$, because in order to enable every valid parallel execution, we need to split every operation $op_i$ of sequences $op_1, \ldots, op_n$ into a separate fragment. So $\xsplit^\prime(op, x, y)$ only differs from $\xsplit(op, x, y)$ in the case of sequences, creating a separate fragment of every contained operation. This difference is important for preserving the original semantics of \textit{parallels} -- using the original $\xsplit$, would not enable every interleaving of the branch executions, by making the execution of non-splittable sequences atomic.
+ 
+The $join$ fragment $\joinfrag(\xi, y, PC)$ checks $pc = \xi$, and $pc_i = 0$ for every $pc_i \in PC$, then assigns $y$ to $pc$. Informally, the $join$ fragment awaits the finishing of every parallel branch. Formally, $\joinfrag(\xi, y, PC) = ([pc = \xi \land \bigwedge_{i=1}^{|PC|} pc_i = 0], pc := y)$.
+
+\begin{example}[Splitting parallel]  For transition $t = ((x := 1, y := x)\textup{ || }(x := 2, y := x))$ with a splittable $parallel$ with two 2-long sequences, splitting will use 2 \textit{branch program counters} $pc_1, pc_2$, and result in 6 fragments:
+
+\begin{align*}
+\xsplit(t) = \xsplit(t,0,0) = \begin{Bmatrix}
+([pc = 0], pc_1 := 1, pc_2 := 1, pc := 2), \\
+([pc = 1 \land pc_1 = 1], x := 1, pc_1 := 2), \\
+([pc = 1 \land pc_1 = 2], y := x, pc_1 := 0), \\
+([pc = 1 \land pc_2 = 1], x := 2, pc_2 := 2), \\
+([pc = 1 \land pc_2 = 2], y := x, pc_2 := 0), \\
+([pc = 1 \land pc_1 = 0 \land pc_2 = 0], pc := 0)
+\end{Bmatrix}
+\end{align*}
+\end{example}
+
+\subsection{Local Variables}
+Splitting can cause the declaration and usage of a local variable to end up in different transitions (fragments). Therefore, some local variables may become global and management of the scope has to be emulated with additional operations.
+
+After the splitting of a transition relation $T$, a post-process step is needed to fix the broken local variables whose declaration and usage ended up in different fragments.
+
+\begin{definition}[Usage relation of local variables]
+    In case of a transition relation $T$, $U \subseteq V_\ell \times T^\prime$ is the \emph{usage relation} of the local variables, where $V_\ell$ is the set of local variables declared in any $t \in T^\prime$, and $T^\prime$ is the transition relation after splitting ($split(T) = T^\prime$).
+\end{definition}
+
+We have $(v_\ell, t) \in U$ \emph{iff} transition $t$ uses local variable $v_\ell$ either in
+\begin{itemize}
+    \item a local variable declaration $var\ v_\ell : D_{v_\ell}$,
+    \item an assignment $v_\ell := \varphi$,
+    \item an expression $\varphi$ (either in an assumption or the right-hand-side of an assignment or declaration), or
+    \item a havoc $\havoc(v_\ell)$.
+\end{itemize}
+
+\begin{definition}[End fragments of local variable scope]
+    As defined in \autoref{ssec:xsts-ops}, the \emph{scope} $\scope(v_\ell)$ of a local variable $v_\ell$ is its direct container composite operation. During splitting, this scope may be split into several fragments $F$: $\xsplit(\scope(v_\ell), x, y) = F = \{ f_1, \ldots, f_n \}$. The \emph{end fragments} $F_E$ of scope $sc$ are defined as the subset of fragments $F_E \subseteq F$ which end with an assumption $[pc = y]$. We use the notation $F_E(v_\ell)$ for the set of end fragments of the scope of local variable $v_\ell$.
+
+    Due to our previous assumptions, the scope of $v_\ell$ is always a sequential action ending with a composite or a basic operation $op_n$. If $op_n$ is a basic operation, it is the only end of the scope, so $|F_E(v_\ell)| = 1$. If $op_n$ is a composite operation with more branches (e.g., choice, parallel), the ends of the scope consist of the end(s) of every branch (which may have more branches, recursively).
+\end{definition}
+
+For every local variable $v_\ell \in V_\ell$ used by more fragments ($(v_\ell, t_1) \in U$ and $(v_\ell, t_2) \in U$ and $t_1 \neq t_2$), we execute the following steps:
+\begin{enumerate}
+    \item Make the local variable \textit{global} by removing the local variable declaration and adding $v_\ell$ to $V^\prime$. This means, that $v_\ell$ will be in $V^\prime$ permanently, not only during its original scope.
+    The original initial value $IV(v_\ell) = \varphi$ of $v_\ell$ is replaced with the initial value of its type $D_{v_\ell}$, so as a global variable, it will be initialized to $IV(D_{v_\ell})$.
+    \item Add an assignment $v_\ell := \varphi$ to the original place of the local variable declaration (if $\varphi \neq IV(D_{v_\ell})$, i.e., the original initial value is not the initial value of its type).
+    \item Append an assignment $v_\ell := IV(D_{v_\ell})$ to every end fragment $f_E \in F_E(v_\ell)$ of the scope of $v_\ell$ to reset the variable. 
+    This transformation guarantees that $v_\ell = IV(D_{v_\ell})$ outside of the original scope of $v_\ell$. This is not required by the semantics but helps in reducing the state space.
+\end{enumerate}
+
+\begin{example}[Splitting local variable usages]
+    For transition $t = (v_\ell : integer := 1, ((v_\ell := v_\ell + 1)\ or\ (v_\ell := v_\ell + 2)), [v_\ell > 1])$ with a local variable $v_\ell$ used by both of the branches of a choice, splitting will result in 4 fragments, while $v_\ell$ will be made global, i.e., added to $V^\prime$ with initial value $IV(v_\ell) = IV(D_{v_\ell}) = IV(integer) = 0$:
+
+    \begin{align*}
+    \xsplit(t) = \xsplit(t,0,0) = \begin{Bmatrix}
+    ([pc = 0], & v_\ell := 1, & pc := 1), \\
+    ([pc = 1], & v_\ell := v_\ell + 1, & pc := 2), \\
+    ([pc = 1], & v_\ell := v_\ell + 2, & pc := 2), \\
+    ([pc = 2], & [v_\ell > 1], v_\ell := 0, & pc := 0)
+    \end{Bmatrix}
+    \end{align*}
+
+    Note, that the original initial value $1$ of $v_\ell$ is set at the place of the original local variable declaration, and at the end of its original scope, $v_\ell$ is set back to $0$, which is the initial value of its type.
+\end{example}
+
+\section{Merging Transition Relations}\label{sec:merging-tranrels}
+
+Splitting every transition relation $In, En, Tr$ of an XSTS model independently, may modify the original semantics of the model, because the execution order of the transition relations $In, En, Tr, En, Tr, \ldots, En, Tr$ would execute only fragments in this order, instead of originally atomic transitions.
+
+To avoid this difference in the semantics of the non-split and split models, we merge every fragment $t \in \xsplit(In) \cup \xsplit(En)$ into $\xsplit(Tr)$, and force the original execution order of transition relations with explicit assumptions and assignments of newly introduced variables.
+
+Formally, we extend the variables $V$ of the system with two Boolean variables $init$ and $trans$: $V^\prime = V \cup \{ init, trans \}$, $D_{init} = D_{trans} = bool$, $IV(init) = \textit{true}$, $IV(trans) = \textit{false}$.
+
+Informally, the value of $init$ and $trans$ denote which original transition relation should execute:
+\begin{itemize}
+    \item $init$ denotes the execution of the original $In$ transition relation
+        \item $\neg init \land \neg trans$ denotes the execution of the original $En$ transition relation
+    \item $\neg init \land trans$ denotes the execution of the original $Tr$ transition relation
+\end{itemize}
+
+In order to enforce these rules, certain assumptions and assignments are necessary. The assumptions are needed at the beginning of every split fragment, while the assignments are only needed at the end of the original non-split transitions. To achieve this, the following steps are required:
+
+\begin{enumerate}
+    \item We extend every original non-split transition $t = op, t \in In \cup En \cup Tr, op \in Ops$ with the following assignments, resulting in $t^\prime$:
+    \begin{itemize}
+        \item $t \leadsto t^\prime=(op, init:=\textit{false})$ for every $t \in In$
+        \item $t \leadsto t^\prime=(op, trans:=\textit{true})$ for every $t \in En$
+        \item $t \leadsto t^\prime=(op, trans:=\textit{false})$ for every $t \in Tr$
+    \end{itemize}
+    \item We split every transition relation (containing the $t^\prime$ transitions extended in the previous step), resulting in split transition relations $\xsplit(In)$, $\xsplit(En)$, and $\xsplit(Tr)$
+    \item We extend every split fragment $f = op, f \in \xsplit(In) \cup \xsplit(En) \cup \xsplit(Tr), op \in Ops$ with the following assumptions, resulting in $f^\prime$:
+    \begin{itemize}
+        \item $f \leadsto f^\prime=([init], op)$ for every $f \in \xsplit(In)$
+        \item $f \leadsto f^\prime=([\neg init \land \neg trans], op)$ for every $f \in \xsplit(En)$
+        \item $f \leadsto f^\prime=([\neg init \land trans], op)$ for every $f \in \xsplit(Tr)$
+    \end{itemize}
+\end{enumerate}
+
+After these transformations, we can merge the $f^\prime$ fragments from $\xsplit(In)$, $\xsplit(En)$, and $\xsplit(Tr)$ into $Tr^\prime$, while $In^\prime = En^\prime = \emptyset$. The resulting $\langle V^\prime, Tr^\prime, In^\prime, En^\prime \rangle$ model will have the same executions as the original model has.
+
+\begin{example}[Merging transition relations]
+Given an XSTS model $\langle V, Tr, In, En \rangle$, where $Tr = \{ tr_1, tr_2 \}$, $In = \{ in_1, in_2 \}$, and $En = \{ en_1, en_2 \}$ (all transitions are non-splittable) the merged XSTS model will be $\langle V^\prime, Tr^\prime, In^\prime, En^\prime \rangle$, where $V^\prime = V \cup \{ init, trans \}$, $In^\prime = En^\prime = \emptyset$, and
+
+\begin{align*}
+Tr^\prime = \begin{Bmatrix}
+(&[init],& in_1,& init := \textit{false}&), \\
+(&[init],& in_2,& init := \textit{false}&), \\
+(&[\neg init \land \neg trans],& en_1,& trans := \textit{true}&), \\
+(&[\neg init \land \neg trans],& en_2,& trans := \textit{true}&), \\
+(&[\neg init \land trans],& tr_1, &trans := \textit{false}&), \\
+(&[\neg init \land trans],& tr_2, &trans := \textit{false}&) \\
+\end{Bmatrix}
+\end{align*}
+\end{example}
+
+\section{Implementation}\label{sec:split-impl}
+
+I implemented splitting as an extension of the Gamma Statechart Composition Framework. Gamma tasks (such as a Gamma-to-XSTS transformation, called an \textit{analysis} task) can be defined in \textit{.ggen} files, based on an \textit{Xtext}\footnote{\url{https://www.eclipse.org/Xtext/}} grammar and an \textit{Eclipse Modeling Framework} (EMF)\footnote{\url{https://www.eclipse.org/modeling/emf/}} metamodel. I added a configuration option to the Gamma-to-XSTS transformation for splitting.
+
+Currently, the implementation supports two splitting configurations:
+\begin{itemize}
+    \item \textit{NONE} (default): no transition is split at all.
+    \item \textit{CHOICE}: every transition is split by choices, conditionals, parallels, and havocs (see \autoref{sec:splitting-rules}) and every transition relation is merged into $Tr$ (see \autoref{sec:merging-tranrels}).
+\end{itemize}
+
+Although these two options could be modeled with a simple boolean, for future extendability, I added an enum type \textsf{AnalysisSplit} to the EMF metamodel with literals \textsf{NONE} and \textsf{CHOICE}. I extended the \textsf{AnalysisModelTransformation} class (which represents an analysis task defined in a .ggen file) with a field \textsf{split} type of \textsf{AnalysisSplit}, and extended the grammar rules, respectively. The textual syntax of an example analysis model transformation task with a split option is shown in \autoref{lst:split-ggen-example}.
+
+\begin{lstlisting}[float={htbp},language=ggen,caption={Example analysis model transformation task with a split option in a .ggen file.},label={lst:split-ggen-example},linewidth=\textwidth]
+analysis {
+    component: System
+    language: Theta
+    split-by: CHOICE
+}
+\end{lstlisting}
+
+I extended the existing \textsf{execute} method of the \textsf{GammaToXstsTransformer} class with a conditional call (based on the value of the \textsf{split} field) to the \textsf{split} method of the newly created \textsf{XstsSplitter} class in which I implemented the splitting algorithm. Basically, splitting is a post-process step after the existing Gamma-to-XSTS model transformation.
+
+% https://tex.stackexchange.com/a/12233
+\urldef\xtenddispatchdurl\url{https://www.eclipse.org/xtend/documentation/202_xtend_classes_members.html#polymorphic-dispatch}
+
+The \textsf{XstsSplitter} class is written in \textit{Xtend}\footnote{url{https://www.eclipse.org/xtend/}} which is a modern dialect of Java introducing some language elements to make coding more efficient, such as \textit{dispatch} methods. According to the Xtend documentation:\footnote{\xtenddispatchdurl}
+
+``For a set of visible dispatch methods in the current type hierarchy with the same name and the same number of arguments, the compiler infers a synthetic dispatcher method. This dispatcher uses the common supertype of all declared arguments. The method name of the actual dispatch cases is prepended with an underscore and the visibility of these methods is reduced to protected if they have been defined as public methods. Client code always binds to the synthesized dispatcher method.``
+
+Dispatch methods provide a convenient way to implement some type-based logic for different types of a type hierarchy. In the case of splitting, the splitting rules are implemented as \textit{dispatch} methods for every XSTS operation type. This approach is easily extendable and configurable with further options.
+
+I also added some new annotations to the XSTS metamodel in order to denote whether an XSTS model is split or not, and whether its transition relations are merged or not.
+\begin{itemize}
+    \item \textsf{SplitAnnotation} denotes that the XSTS model is split, i.e., transitions do not contain internal non-determinism.
+    \item \textsf{NoEnvAnnotation} denotes that $En$ and $In$ are empty, i.e., only $Tr$ contains non-empty transitions.
+\end{itemize}
+
+The textual syntax of the annotations is shown in \autoref{lst:split-xsts-example}.
+
+\begin{lstlisting}[float={htbp},language=xsts,caption={Example split XSTS model with annotations.},label={lst:split-xsts-example},linewidth=\textwidth]
+//@split
+//@noenv
+...
+trans {
+    ...
+}
+init{
+}
+env{
+}
+\end{lstlisting}
